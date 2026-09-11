@@ -45,11 +45,11 @@ jobs:
           - { name: currency,         dockerfile: src/currency/Dockerfile,        build_args: "OPENTELEMETRY_CPP_VERSION" }
           - { name: email,            dockerfile: src/email/Dockerfile,           build_args: "" }
           - { name: flagd-ui,         dockerfile: src/flagd-ui/Dockerfile,        build_args: "" }
-          - { name: fraud-detection,  dockerfile: src/fraud-detection/Dockerfile, build_args: "" }
+          - { name: fraud-detection,  dockerfile: src/fraud-detection/Dockerfile, build_args: "OTEL_JAVA_AGENT_VERSION" }
           - { name: frontend,         dockerfile: src/frontend/Dockerfile,        build_args: "" }
           - { name: frontend-proxy,   dockerfile: src/frontend-proxy/Dockerfile,  build_args: "" }
           - { name: image-provider,   dockerfile: src/image-provider/Dockerfile,  build_args: "" }
-          - { name: kafka,            dockerfile: src/kafka/Dockerfile,           build_args: "" }
+          - { name: kafka,            dockerfile: src/kafka/Dockerfile,           build_args: "OTEL_JAVA_AGENT_VERSION" }
           - { name: load-generator,   dockerfile: src/load-generator/Dockerfile,  build_args: "" }
           - { name: mcp,              dockerfile: src/mcp/Dockerfile,             build_args: "" }
           - { name: opamp-server,     dockerfile: src/opamp-server/Dockerfile,    build_args: "OPAMP_GO_REF" }
