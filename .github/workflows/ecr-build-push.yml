@@ -70,7 +70,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c  # v6.2.4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Log in to Amazon ECR
@@ -81,7 +81,7 @@ jobs:
         id: image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'otel-demo' }}
+          REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'ecomerce' }}
           SERVICE_NAME: ${{ matrix.service.name }}
         run: |
           REPOSITORY="${REPO_PREFIX}/${SERVICE_NAME}"
