@@ -1,0 +1,129 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Simple, self-contained pipeline: builds every demo microservice's Docker
+# image and pushes it to AWS ECR. Deliberately does not reuse or extend
+# component-build-images.yml (which pushes to GHCR/Docker Hub) - this is a
+# separate, easy-to-read path for teams deploying to their own AWS account.
+# One-time AWS setup required before this will run successfully - see
+# docs/ci/ecr-pipeline.md.
+name: Build and Push Images to ECR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'pb/**'
+      - '.env'
+      - '.github/workflows/ecr-build-push.yml'
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required to request the OIDC token for AssumeRoleWithWebIdentity
+  contents: read    # required for actions/checkout
+
+concurrency:
+  group: ecr-build-push-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a run mid-push, could leave a half-pushed multi-arch manifest
+
+jobs:
+  build-and-push:
+    name: Build & push ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false   # one service failing should not cancel the other 23
+      # max-parallel: 8  # uncomment to throttle if ECR/Docker Hub rate limits are hit
+      matrix:
+        service:
+          - { name: accounting,      dockerfile: src/accounting/Dockerfile,      build_args: "" }
+          - { name: ad,               dockerfile: src/ad/Dockerfile,              build_args: "OTEL_JAVA_AGENT_VERSION" }
+          - { name: agent,            dockerfile: src/agent/Dockerfile,           build_args: "" }
+          - { name: cart,             dockerfile: src/cart/src/Dockerfile,        build_args: "" }
+          - { name: chatbot,          dockerfile: src/chatbot/Dockerfile,         build_args: "" }
+          - { name: checkout,         dockerfile: src/checkout/Dockerfile,        build_args: "" }
+          - { name: currency,         dockerfile: src/currency/Dockerfile,        build_args: "OPENTELEMETRY_CPP_VERSION" }
+          - { name: email,            dockerfile: src/email/Dockerfile,           build_args: "" }
+          - { name: flagd-ui,         dockerfile: src/flagd-ui/Dockerfile,        build_args: "" }
+          - { name: fraud-detection,  dockerfile: src/fraud-detection/Dockerfile, build_args: "" }
+          - { name: frontend,         dockerfile: src/frontend/Dockerfile,        build_args: "" }
+          - { name: frontend-proxy,   dockerfile: src/frontend-proxy/Dockerfile,  build_args: "" }
+          - { name: image-provider,   dockerfile: src/image-provider/Dockerfile,  build_args: "" }
+          - { name: kafka,            dockerfile: src/kafka/Dockerfile,           build_args: "" }
+          - { name: load-generator,   dockerfile: src/load-generator/Dockerfile,  build_args: "" }
+          - { name: mcp,              dockerfile: src/mcp/Dockerfile,             build_args: "" }
+          - { name: opamp-server,     dockerfile: src/opamp-server/Dockerfile,    build_args: "OPAMP_GO_REF" }
+          - { name: opensearch,       dockerfile: src/opensearch/Dockerfile,      build_args: "" }
+          - { name: payment,          dockerfile: src/payment/Dockerfile,         build_args: "" }
+          - { name: product-catalog,  dockerfile: src/product-catalog/Dockerfile, build_args: "" }
+          - { name: quote,            dockerfile: src/quote/Dockerfile,           build_args: "" }
+          - { name: recommendation,   dockerfile: src/recommendation/Dockerfile,  build_args: "" }
+          - { name: shipping,         dockerfile: src/shipping/Dockerfile,        build_args: "" }
+          - { name: telemetry-docs,   dockerfile: src/telemetry-docs/Dockerfile,  build_args: "" }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Load version pins from .env
+        run: grep -vE '^\s*#|^\s*$' .env >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c  # v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
+
+      - name: Set image repository and tags
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'otel-demo' }}
+          SERVICE_NAME: ${{ matrix.service.name }}
+        run: |
+          REPOSITORY="${REPO_PREFIX}/${SERVICE_NAME}"
+          SHORT_SHA="${GITHUB_SHA::8}"
+          echo "repository=${REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "tags=${REGISTRY}/${REPOSITORY}:latest,${REGISTRY}/${REPOSITORY}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure ECR repository exists
+        env:
+          REPOSITORY: ${{ steps.image.outputs.repository }}
+        run: |
+          aws ecr describe-repositories --repository-names "$REPOSITORY" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "$REPOSITORY" --image-scanning-configuration scanOnPush=true
+
+      - name: Resolve build args for this service
+        id: build_args
+        env:
+          ARG_NAMES: ${{ matrix.service.build_args }}
+        run: |
+          {
+            echo "args<<EOF"
+            IFS=',' read -ra NAMES <<< "$ARG_NAMES"
+            for name in "${NAMES[@]}"; do
+              [ -n "$name" ] && echo "${name}=${!name}"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a  # v4.3.0
+        with:
+          image: tonistiigi/binfmt:master
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
+
+      - name: Build and push image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: ${{ steps.build_args.outputs.args }}
+          tags: ${{ steps.image.outputs.tags }}
