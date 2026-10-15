@@ -55,8 +55,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
+      # Only the build-arg version pins. Loading the whole .env also exported
+      # unexpanded values like OTEL_EXPORTER_OTLP_ENDPOINT=http://${...}, which
+      # buildx then tried (and failed) to parse as its own telemetry endpoint.
       - name: Load version pins from .env
-        run: grep -vE '^\s*#|^\s*$' .env >> "$GITHUB_ENV"
+        run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c  # v6.2.4
@@ -67,6 +70,15 @@ jobs:
       - name: Log in to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
+
+      # Authenticated pulls of base images from public.ecr.aws (e.g. OpenSearch).
+      # Anonymous pulls share GitHub runner IPs and hit
+      # "429 Too Many Requests: Data limit exceeded". The action authenticates
+      # in us-east-1 itself (ECR Public only works there).
+      - name: Log in to Amazon ECR Public
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
+        with:
+          registry-type: public
 
       - name: Set image repository and tags
         id: image

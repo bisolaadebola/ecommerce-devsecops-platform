@@ -70,6 +70,11 @@ don't set one).
     },
     {
       "Effect": "Allow",
+      "Action": ["ecr-public:GetAuthorizationToken", "sts:GetServiceBearerToken"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
       "Action": [
         "ecr:CreateRepository",
         "ecr:DescribeRepositories",
@@ -88,7 +93,10 @@ don't set one).
 ```
 
 `ecr:GetAuthorizationToken` must use `Resource: "*"` — it doesn't support
-resource-level scoping. Everything else is scoped to the repository-name
+resource-level scoping. The same applies to `ecr-public:GetAuthorizationToken`
+and `sts:GetServiceBearerToken`, which the workflow needs to log in to
+`public.ecr.aws` so base-image pulls (e.g. OpenSearch) are authenticated
+instead of hitting the anonymous `429 Too Many Requests` limit. Everything else is scoped to the repository-name
 prefix this workflow uses.
 
 ## 4. Set the required GitHub repository variables
