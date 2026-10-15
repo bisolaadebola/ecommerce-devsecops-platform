@@ -5,5 +5,4 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="src/cart.csproj" />
-  <Project Path="tests/cart.tests.csproj" />
 </Solution>

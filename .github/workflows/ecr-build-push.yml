@@ -3,130 +3,91 @@ name: Build and Push Images to ECR
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'pb/**'
-      - '.env'
-      - '.github/workflows/ecr-build-push.yml'
+    paths: ['src/**', 'pb/**', '.env', '.github/workflows/ecr-build-push.yml']
   workflow_dispatch: {}
 
 permissions:
-  id-token: write   # required to request the OIDC token for AssumeRoleWithWebIdentity
-  contents: read    # required for actions/checkout
+  id-token: write # lets GitHub log in to AWS without stored keys (OIDC)
+  contents: read
 
-concurrency:
-  group: ecr-build-push-${{ github.ref }}
-  cancel-in-progress: false   # never cancel a run mid-push, could leave a half-pushed multi-arch manifest
+concurrency: ecr-build-push # one run at a time
 
 jobs:
+  # ---- 1. Build one image per service (they run in parallel) ----
   build-and-push:
-    name: Build & push ${{ matrix.service.name }}
+    name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false   # one service failing should not cancel the other 23
-      # max-parallel: 8  # uncomment to throttle if ECR/Docker Hub rate limits are hit
+      fail-fast: false # one failed service doesn't stop the others
       matrix:
-        service:
-          - { name: accounting,      dockerfile: src/accounting/Dockerfile,      build_args: "" }
-          - { name: ad,               dockerfile: src/ad/Dockerfile,              build_args: "OTEL_JAVA_AGENT_VERSION" }
-          - { name: agent,            dockerfile: src/agent/Dockerfile,           build_args: "" }
-          - { name: cart,             dockerfile: src/cart/src/Dockerfile,        build_args: "" }
-          - { name: chatbot,          dockerfile: src/chatbot/Dockerfile,         build_args: "" }
-          - { name: checkout,         dockerfile: src/checkout/Dockerfile,        build_args: "" }
-          - { name: currency,         dockerfile: src/currency/Dockerfile,        build_args: "OPENTELEMETRY_CPP_VERSION" }
-          - { name: email,            dockerfile: src/email/Dockerfile,           build_args: "" }
-          - { name: flagd-ui,         dockerfile: src/flagd-ui/Dockerfile,        build_args: "" }
-          - { name: fraud-detection,  dockerfile: src/fraud-detection/Dockerfile, build_args: "OTEL_JAVA_AGENT_VERSION" }
-          - { name: frontend,         dockerfile: src/frontend/Dockerfile,        build_args: "" }
-          - { name: frontend-proxy,   dockerfile: src/frontend-proxy/Dockerfile,  build_args: "" }
-          - { name: image-provider,   dockerfile: src/image-provider/Dockerfile,  build_args: "" }
-          - { name: kafka,            dockerfile: src/kafka/Dockerfile,           build_args: "OTEL_JAVA_AGENT_VERSION" }
-          - { name: load-generator,   dockerfile: src/load-generator/Dockerfile,  build_args: "" }
-          - { name: mcp,              dockerfile: src/mcp/Dockerfile,             build_args: "" }
-          - { name: opamp-server,     dockerfile: src/opamp-server/Dockerfile,    build_args: "OPAMP_GO_REF" }
-          - { name: opensearch,       dockerfile: src/opensearch/Dockerfile,      build_args: "" }
-          - { name: payment,          dockerfile: src/payment/Dockerfile,         build_args: "" }
-          - { name: product-catalog,  dockerfile: src/product-catalog/Dockerfile, build_args: "" }
-          - { name: quote,            dockerfile: src/quote/Dockerfile,           build_args: "" }
-          - { name: recommendation,   dockerfile: src/recommendation/Dockerfile,  build_args: "" }
-          - { name: shipping,         dockerfile: src/shipping/Dockerfile,        build_args: "" }
-          - { name: telemetry-docs,   dockerfile: src/telemetry-docs/Dockerfile,  build_args: "" }
+        service: [accounting, ad, agent, cart, chatbot, checkout, currency, email,
+                  flagd-ui, fraud-detection, frontend, frontend-proxy, image-provider,
+                  kafka, load-generator, mcp, opamp-server, opensearch, payment,
+                  product-catalog, quote, recommendation, shipping, telemetry-docs]
+    env:
+      IMAGE: ecomerce/${{ matrix.service }} # ECR repository name
+      # Every Dockerfile is at src/<service>/Dockerfile, except cart's
+      DOCKERFILE: ${{ matrix.service == 'cart' && 'src/cart/src/Dockerfile' || format('src/{0}/Dockerfile', matrix.service) }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/checkout@v7
 
-      # Only the build-arg version pins. Loading the whole .env also exported
-      # unexpanded values like OTEL_EXPORTER_OTLP_ENDPOINT=http://${...}, which
-      # buildx then tried (and failed) to parse as its own telemetry endpoint.
-      - name: Load version pins from .env
-        run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c  # v6.2.4
+      - name: Log in to AWS
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Log in to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
+      - name: Log in to ECR (our images)
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # Authenticated pulls of base images from public.ecr.aws (e.g. OpenSearch).
-      # Anonymous pulls share GitHub runner IPs and hit
-      # "429 Too Many Requests: Data limit exceeded". The action authenticates
-      # in us-east-1 itself (ECR Public only works there).
-      - name: Log in to Amazon ECR Public
-        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
+      - name: Log in to ECR Public (base images, avoids rate limits)
+        uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: public
 
-      - name: Set image repository and tags
-        id: image
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'ecomerce' }}
-          SERVICE_NAME: ${{ matrix.service.name }}
-        run: |
-          REPOSITORY="${REPO_PREFIX}/${SERVICE_NAME}"
-          SHORT_SHA="${GITHUB_SHA::8}"
-          echo "repository=${REPOSITORY}" >> "$GITHUB_OUTPUT"
-          echo "tags=${REGISTRY}/${REPOSITORY}:latest,${REGISTRY}/${REPOSITORY}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Create the ECR repository if it doesn't exist
+        run: aws ecr describe-repositories --repository-names "$IMAGE" ||
+             aws ecr create-repository --repository-name "$IMAGE" --image-scanning-configuration scanOnPush=true
 
-      - name: Ensure ECR repository exists
-        env:
-          REPOSITORY: ${{ steps.image.outputs.repository }}
-        run: |
-          aws ecr describe-repositories --repository-names "$REPOSITORY" >/dev/null 2>&1 || \
-          aws ecr create-repository --repository-name "$REPOSITORY" --image-scanning-configuration scanOnPush=true
+      - name: Read version pins from .env
+        run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
 
-      - name: Resolve build args for this service
-        id: build_args
-        env:
-          ARG_NAMES: ${{ matrix.service.build_args }}
-        run: |
-          {
-            echo "args<<EOF"
-            IFS=',' read -ra NAMES <<< "$ARG_NAMES"
-            for name in "${NAMES[@]}"; do
-              [ -n "$name" ] && echo "${name}=${!name}"
-            done
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4 # needed to build arm64 images
+      - uses: docker/setup-buildx-action@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a  # v4.3.0
-        with:
-          image: tonistiigi/binfmt:master
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
-
-      - name: Build and push image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+      - name: Build and push
+        uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ matrix.service.dockerfile }}
+          file: ${{ env.DOCKERFILE }}
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: ${{ steps.build_args.outputs.args }}
-          tags: ${{ steps.image.outputs.tags }}
+          # Version pins; services that don't use one ignore it
+          build-args: |
+            OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
+            OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
+            OPAMP_GO_REF=${{ env.OPAMP_GO_REF }}
+          # Tag = the commit SHA, plus "latest"
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
+
+  # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
+  update-k8s-manifests:
+    needs: build-and-push # runs only if every image built
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: digitalwitchdemo/k8s-file
+          token: ${{ secrets.K8S_REPO_TOKEN }}
+
+      - name: Set the new image tag and push
+        run: |
+          TAG="$GITHUB_SHA" # same tag the build job pushed
+          sed -i -E "s|^(    newTag: ).*|\1\"$TAG\"|" kustomization.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Deploy images $TAG" || exit 0 # nothing changed
+          git push
