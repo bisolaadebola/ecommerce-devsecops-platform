@@ -43,7 +43,7 @@ The workflow runs on every push to `main` that changes `src/`, `pb/` or `.env`.
 
 | Job | What it does |
 |---|---|
-| **build-and-push** | Builds all 24 images **in parallel** and pushes each to ECR as `ecomerce/<service>`, tagged with the **commit SHA** and `latest` |
+| **build-and-push** | Builds all 24 images **in parallel** and pushes each to ECR as `ecomerce/<service>`, tagged with the **run number** (the `#N` shown in Actions, e.g. `8`) and `latest` |
 | **update-k8s-manifests** | Runs only if **all** images built. Writes the new tag into `k8s-file/kustomization.yaml` and pushes it |
 
 Argo CD watches `k8s-file` and rolls out the new images within ~3 minutes.
@@ -81,8 +81,8 @@ Then follow it:
 | Step | Where to look |
 |---|---|
 | Images building | GitHub → **Actions** → *Build and Push Images to ECR* |
-| Images in ECR | AWS Console → **ECR** → `ecomerce/<service>`; the newest tag = your commit SHA |
-| Tag updated | `k8s-file` repo → new commit **"Deploy images &lt;sha&gt;"** |
+| Images in ECR | AWS Console → **ECR** → `ecomerce/<service>`; the newest tag = the run number (`#N`) |
+| Tag updated | `k8s-file` repo → new commit **"Deploy images from build #N"** |
 | Deployed | Argo CD UI → app **astronomy-shop** = `Synced` / `Healthy` |
 | Live | https://shop.digitalwitch.online |
 

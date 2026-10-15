@@ -68,9 +68,9 @@ jobs:
             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
             OPAMP_GO_REF=${{ env.OPAMP_GO_REF }}
-          # Tag = the commit SHA, plus "latest"
+          # Tag = the workflow run number (the #N shown in Actions), plus "latest"
           tags: |
-            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.run_number }}
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
 
   # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
@@ -85,9 +85,9 @@ jobs:
 
       - name: Set the new image tag and push
         run: |
-          TAG="$GITHUB_SHA" # same tag the build job pushed
+          TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
           sed -i -E "s|^(    newTag: ).*|\1\"$TAG\"|" kustomization.yaml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Deploy images $TAG" || exit 0 # nothing changed
+          git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
           git push
