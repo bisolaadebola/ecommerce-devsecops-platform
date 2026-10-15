@@ -3,7 +3,13 @@
 
 FROM envoyproxy/envoy:v1.39.1@sha256:57e14a549d7bd43c8d3f6d03e8cfa653e037d4b38e133acd9b54f38c524401b4
 
-RUN apt-get update && \
+# Retry apt-get update: Ubuntu mirrors (especially ports.ubuntu.com for arm64)
+# briefly serve mismatched index files while they sync ("Hash Sum mismatch").
+RUN for i in 1 2 3 4 5; do \
+      apt-get -o Acquire::Retries=3 update && break; \
+      echo "apt-get update failed (attempt $i), retrying in 20s..."; \
+      rm -rf /var/lib/apt/lists/*; sleep 20; \
+    done && \
     apt-get install -y gettext-base && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
