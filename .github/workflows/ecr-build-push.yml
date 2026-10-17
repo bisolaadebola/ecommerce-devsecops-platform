@@ -7,18 +7,17 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write # lets GitHub log in to AWS without stored keys (OIDC)
+  id-token: write 
   contents: read
 
-concurrency: ecr-build-push # one run at a time
+concurrency: ecr-build-push
 
 jobs:
-  # ---- 1. Build one image per service (they run in parallel) ----
   build-and-push:
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # one failed service doesn't stop the others
+      fail-fast: false 
       matrix:
         service: [accounting, ad, agent, cart, chatbot, checkout, currency, email,
                   flagd-ui, fraud-detection, frontend, frontend-proxy, image-provider,
@@ -68,7 +67,6 @@ jobs:
             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
             OPAMP_GO_REF=${{ env.OPAMP_GO_REF }}
-          # Tag = the workflow run number (the #N shown in Actions), plus "latest"
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.run_number }}
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
@@ -86,7 +84,7 @@ jobs:
       - name: Set the new image tag and push
         run: |
           TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
-          sed -i -E "s|^(    newTag: ).*|\1\"$TAG\"|" kustomization.yaml
+          sed -i -E "s|^(    newTag: ).*|\1\"$TAG\"|" */kustomization.yaml # tags live in each layer folder
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
