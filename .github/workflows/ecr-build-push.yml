@@ -15,7 +15,7 @@ concurrency: ecr-build-push
 jobs:
   build-and-push:
     name: Build ${{ matrix.service }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       fail-fast: false 
       matrix:
@@ -77,7 +77,7 @@ jobs:
   # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
   update-k8s-manifests:
     needs: build-and-push # runs only if every image built
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
         with:
