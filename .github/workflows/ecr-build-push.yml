@@ -37,6 +37,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: who ami
+        run: |
+          @USER ; whoami
+
       - name: Log in to ECR (our images)
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
