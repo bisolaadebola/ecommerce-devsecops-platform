@@ -22,7 +22,7 @@ const Home: NextPage = () => {
   return (
     <Layout>
       <Head>
-        <title>Otel Demo - Home</title>
+        <title>DigitalWitch - Home</title>
       </Head>
       <S.Home data-cy={CypressFields.HomePage}>
         <Banner />

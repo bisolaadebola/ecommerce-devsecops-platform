@@ -5,14 +5,16 @@ import { DefaultTheme } from 'styled-components';
 
 const Theme: DefaultTheme = {
   colors: {
-    otelBlue: '#5262A8',
-    otelYellow: '#EAAA3B',
-    otelGray: '#403F4B',
+    // DigitalWitch brand (key names kept from the upstream demo)
+    otelBlue: '#1F6FD1', // brand blue: buttons, links
+
+    otelYellow: '#C8902E', // brand gold: accents
+    otelGray: '#0B1F3A', // deep navy
     otelRed: '#FB7181',
-    backgroundGray: 'rgba(64, 63, 75, 0.1)',
-    lightBorderGray: 'rgba(82, 98, 168, 0.3)',
-    borderGray: '#2E2437',
-    textGray: '#29293E',
+    backgroundGray: 'rgba(31, 111, 209, 0.08)',
+    lightBorderGray: 'rgba(31, 111, 209, 0.3)',
+    borderGray: '#0B1F3A',
+    textGray: '#0B1F3A',
     textLightGray: '#78788C',
     white: '#FFFFFF',
   },

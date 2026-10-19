@@ -21,13 +21,14 @@ const Footer = () => {
   return (
     <S.Footer>
       <div>
-        <p>This website is hosted for demo purpose only. It is not an actual shop.</p>
+        <p>This website is a DigitalWitch training environment. It is not an actual shop.</p>
         <p>
           <span data-cy={CypressFields.SessionId}>session-id: {sessionId}</span>
         </p>
       </div>
       <p>
-        @ {currentYear} OpenTelemetry (<a href="https://github.com/open-telemetry/opentelemetry-demo">Source Code</a>)
+        © {currentYear} DigitalWitch Support Community · Built on the{' '}
+        <a href="https://github.com/open-telemetry/opentelemetry-demo">OpenTelemetry Demo</a>
       </p>
       <PlatformFlag />
     </S.Footer>

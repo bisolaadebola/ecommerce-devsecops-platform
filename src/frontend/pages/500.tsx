@@ -12,7 +12,7 @@ const ServerErrorPage: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Otel Demo - Server Error</title>
+        <title>DigitalWitch - Server Error</title>
       </Head>
       <S.Container>
         <S.Code>500</S.Code>

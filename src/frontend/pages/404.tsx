@@ -12,7 +12,7 @@ const NotFoundPage: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Otel Demo - Page Not Found</title>
+        <title>DigitalWitch - Page Not Found</title>
       </Head>
       <S.Container>
         <S.Code>404</S.Code>

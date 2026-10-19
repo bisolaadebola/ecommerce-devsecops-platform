@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" role="img" aria-label="DigitalWitch Support Community">
+  <title>DigitalWitch</title>
+  <!-- headset icon -->
+  <g fill="none" stroke="#1F6FD1" stroke-width="4" stroke-linecap="round">
+    <path d="M10 36 V30 a18 18 0 0 1 36 0 V36"/>
+    <path d="M44 44 q0 10 -12 10 h-4"/>
+  </g>
+  <rect x="5" y="32" width="10" height="16" rx="4" fill="#1F6FD1"/>
+  <rect x="41" y="32" width="10" height="16" rx="4" fill="#1F6FD1"/>
+  <circle cx="26" cy="54" r="3.5" fill="#C8902E"/>
+  <!-- wordmark -->
+  <text x="62" y="34" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" font-weight="800" fill="#0B1F3A">Digital<tspan fill="#1F6FD1">Witch</tspan></text>
+  <text x="63" y="53" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" letter-spacing="2.2" fill="#C8902E">SUPPORT COMMUNITY</text>
+</svg>

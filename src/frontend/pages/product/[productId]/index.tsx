@@ -65,7 +65,7 @@ const ProductDetail: NextPage = () => {
       contextKeys={[...new Set(categories)]}
     >
       <Head>
-        <title>Otel Demo - Product</title>
+        <title>DigitalWitch - Product</title>
       </Head>
       <Layout>
         <S.ProductDetail data-cy={CypressFields.ProductDetail}>

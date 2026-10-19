@@ -16,7 +16,8 @@ export const Banner = styled.div`
 `;
 
 export const BannerImg = styled.img.attrs({
-  src: '/images/Banner.png',
+  src: '/images/digitalwitch-banner.webp',
+  alt: 'Welcome to DigitalWitch',
 })`
   width: 100%;
   height: auto;
@@ -47,6 +48,17 @@ export const Title = styled.h1`
 
   ${({ theme }) => theme.breakpoints.desktop} {
     font-size: ${({ theme }) => theme.sizes.dxLarge};
+  }
+`;
+
+export const Subtitle = styled.p`
+  margin: 0 0 24px;
+  font-size: ${({ theme }) => theme.sizes.mLarge};
+  font-weight: ${({ theme }) => theme.fonts.semiBold};
+  color: ${({ theme }) => theme.colors.otelYellow};
+
+  ${({ theme }) => theme.breakpoints.desktop} {
+    font-size: ${({ theme }) => theme.sizes.dMedium};
   }
 `;
 
