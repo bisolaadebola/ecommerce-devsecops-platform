@@ -39,7 +39,7 @@ jobs:
 
       - name: who ami
         run: |
-          @USER ; whoami
+           whoami
 
       - name: Log in to ECR (our images)
         id: ecr
