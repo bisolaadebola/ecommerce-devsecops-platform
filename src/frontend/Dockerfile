@@ -8,6 +8,9 @@ WORKDIR /app
 COPY ./src/frontend/package.json package.json
 COPY ./src/frontend/package-lock.json package-lock.json
 
+# Cypress is only used for browser tests (not part of the image); skip its
+# large browser download so the build needs far less disk space
+ENV CYPRESS_INSTALL_BINARY=0
 RUN npm ci
 
 COPY ./src/frontend/components/ components/
