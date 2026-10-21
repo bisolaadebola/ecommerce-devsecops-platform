@@ -42,9 +42,18 @@ class ChatAgentUI:
             agent_data = response.json().get("response", {})
             messages = agent_data.get("messages", [])
             if messages and isinstance(messages, list):
-                return messages[-1].get(
+                content = messages[-1].get(
                     "content", "Agent returned an empty message body."
                 )
+                # Claude replies with a list of blocks (thinking + text);
+                # the chat window only shows the text blocks
+                if isinstance(content, list):
+                    content = "".join(
+                        block.get("text", "")
+                        for block in content
+                        if isinstance(block, dict) and block.get("type") == "text"
+                    )
+                return content
             return "Error: Received an unexpected response format from the agent."
 
         except Exception as e:
