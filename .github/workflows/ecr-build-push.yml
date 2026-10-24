@@ -1,122 +1,122 @@
-name: Build and Push Images to ECR
+# name: Build and Push Images to ECR
 
-on:
-  push:
-    branches: [main]
-    paths: ['src/**', 'pb/**', '.env', '.github/workflows/ecr-build-push.yml']
-  workflow_dispatch: {}
+# on:
+#   push:
+#     branches: [main]
+#     paths: ['src/**', 'pb/**', '.env', '.github/workflows/ecr-build-push.yml']
+#   workflow_dispatch: {}
 
-permissions:
-  id-token: write 
-  contents: read
+# permissions:
+#   id-token: write 
+#   contents: read
 
-concurrency: ecr-build-push
+# concurrency: ecr-build-push
 
-jobs:
-  # ---- 0. The services to build: edit this one list ----
-  services:
-    runs-on: self-hosted
-    outputs:
-      list: ${{ steps.list.outputs.list }}
-    steps:
-      - id: list
-        run: echo 'list=["chatbot"]' >> "$GITHUB_OUTPUT"
-        # All: ["accounting","ad","agent","cart","chatbot","checkout","currency","email",
-        #       "flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider",
-        #       "kafka","load-generator","mcp","opamp-server","opensearch","payment",
-        #       "product-catalog","quote","recommendation","shipping","telemetry-docs"]
+# jobs:
+#   # ---- 0. The services to build: edit this one list ----
+#   services:
+#     runs-on: self-hosted
+#     outputs:
+#       list: ${{ steps.list.outputs.list }}
+#     steps:
+#       - id: list
+#         run: echo 'list=["chatbot"]' >> "$GITHUB_OUTPUT"
+#         All: ["accounting","ad","agent","cart","chatbot","checkout","currency","email",
+#               "flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider",
+#               "kafka","load-generator","mcp","opamp-server","opensearch","payment",
+#               "product-catalog","quote","recommendation","shipping","telemetry-docs"]
 
-  build-and-push:
-    name: Build ${{ matrix.service }}
-    needs: services
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix:
-        service: ${{ fromJSON(needs.services.outputs.list) }}
-    env:
-      IMAGE: ecomerce/${{ matrix.service }} # ECR repository name
-      # Every Dockerfile is at src/<service>/Dockerfile, except cart's
-      DOCKERFILE: ${{ matrix.service == 'cart' && 'src/cart/src/Dockerfile' || format('src/{0}/Dockerfile', matrix.service) }}
-    steps:
-      - uses: actions/checkout@v7
+#   build-and-push:
+#     name: Build ${{ matrix.service }}
+#     needs: services
+#     runs-on: self-hosted
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         service: ${{ fromJSON(needs.services.outputs.list) }}
+#     env:
+#       IMAGE: ecomerce/${{ matrix.service }} # ECR repository name
+#       # Every Dockerfile is at src/<service>/Dockerfile, except cart's
+#       DOCKERFILE: ${{ matrix.service == 'cart' && 'src/cart/src/Dockerfile' || format('src/{0}/Dockerfile', matrix.service) }}
+#     steps:
+#       - uses: actions/checkout@v7
 
-      - name: Log in to AWS
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+#       - name: Log in to AWS
+#         uses: aws-actions/configure-aws-credentials@v6
+#         with:
+#           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+#           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: who ami
-        run: |
-           whoami
+#       - name: who ami
+#         run: |
+#            whoami
 
-      - name: Log in to ECR (our images)
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
+#       - name: Log in to ECR (our images)
+#         id: ecr
+#         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Log in to ECR Public (base images, avoids rate limits)
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry-type: public
+#       - name: Log in to ECR Public (base images, avoids rate limits)
+#         uses: aws-actions/amazon-ecr-login@v2
+#         with:
+#           registry-type: public
 
-      - name: Create the ECR repository if it doesn't exist
-        run: aws ecr describe-repositories --repository-names "$IMAGE" ||
-             aws ecr create-repository --repository-name "$IMAGE" --image-scanning-configuration scanOnPush=true
+#       - name: Create the ECR repository if it doesn't exist
+#         run: aws ecr describe-repositories --repository-names "$IMAGE" ||
+#              aws ecr create-repository --repository-name "$IMAGE" --image-scanning-configuration scanOnPush=true
 
-      - name: Read version pins from .env
-        run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
+#       - name: Read version pins from .env
+#         run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
 
-      # Self-hosted runner: free disk space left over from earlier builds
-      # (layers are still reused from the GitHub Actions cache)
-      - name: Free disk space
-        run: |
-          df -h / | tail -1
-          docker builder prune -af || true
-          docker image prune -af || true
-          df -h / | tail -1
+#       # Self-hosted runner: free disk space left over from earlier builds
+#       # (layers are still reused from the GitHub Actions cache)
+#       - name: Free disk space
+#         run: |
+#           df -h / | tail -1
+#           docker builder prune -af || true
+#           docker image prune -af || true
+#           df -h / | tail -1
 
-      - uses: docker/setup-buildx-action@v4
+#       - uses: docker/setup-buildx-action@v4
 
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ env.DOCKERFILE }}
-          platforms: linux/amd64 # EKS nodes are amd64; arm64 builds ran under slow emulation
-          # Reuse unchanged layers from earlier runs (one cache per service)
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-          push: true
-          # Version pins; services that don't use one ignore it
-          build-args: |
-            OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
-            OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
-            OPAMP_GO_REF=${{ env.OPAMP_GO_REF }}
-          tags: |
-            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.run_number }}
-            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
+#       - name: Build and push
+#         uses: docker/build-push-action@v7
+#         with:
+#           context: .
+#           file: ${{ env.DOCKERFILE }}
+#           platforms: linux/amd64 # EKS nodes are amd64; arm64 builds ran under slow emulation
+#           # Reuse unchanged layers from earlier runs (one cache per service)
+#           cache-from: type=gha,scope=${{ matrix.service }}
+#           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+#           push: true
+#           # Version pins; services that don't use one ignore it
+#           build-args: |
+#             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
+#             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
+#             OPAMP_GO_REF=${{ env.OPAMP_GO_REF }}
+#           tags: |
+#             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.run_number }}
+#             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
 
-  # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
-  update-k8s-manifests:
-    needs: [services, build-and-push] # runs only if every image built
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: digitalwitchdemo/k8s-file
-          token: ${{ secrets.K8S_REPO_TOKEN }}
+#   # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
+#   update-k8s-manifests:
+#     needs: [services, build-and-push] # runs only if every image built
+#     runs-on: self-hosted
+#     steps:
+#       - uses: actions/checkout@v7
+#         with:
+#           repository: digitalwitchdemo/k8s-file
+#           token: ${{ secrets.K8S_REPO_TOKEN }}
 
-      - name: Set the new image tag and push
-        env:
-          SERVICES: ${{ join(fromJSON(needs.services.outputs.list), ' ') }}
-        run: |
-          TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
-          # Only the images built in this run: the newTag line under each "ecomerce/<service>"
-          for svc in $SERVICES; do
-            sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
-          done
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
-          git push
+#       - name: Set the new image tag and push
+#         env:
+#           SERVICES: ${{ join(fromJSON(needs.services.outputs.list), ' ') }}
+#         run: |
+#           TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
+#           # Only the images built in this run: the newTag line under each "ecomerce/<service>"
+#           for svc in $SERVICES; do
+#             sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
+#           done
+#           git config user.name "github-actions[bot]"
+#           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+#           git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
+#           git push

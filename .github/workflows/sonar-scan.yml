@@ -1,0 +1,48 @@
+name: SonarCloud Scan
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', '.github/workflows/sonar-scan.yml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- 0. The services to scan: add one at a time ----
+  services:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - id: list
+        run: echo 'list=["payment"]' >> "$GITHUB_OUTPUT"
+
+  # ---- 1. Scan each service as its own SonarCloud project ----
+  sonar-scan:
+    name: Scan ${{ matrix.service }}
+    needs: services
+    runs-on: ubuntu-latest # SonarCloud is on the internet, so no self-hosted runner needed
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.services.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history, so Sonar can tell new code from old
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        continue-on-error: true # report only for now; don't block the pipeline
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          projectBaseDir: src/${{ matrix.service }}
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_ORGANIZATION }}_ecommerce-${{ matrix.service }}
+            -Dsonar.projectName=ecommerce-${{ matrix.service }}
+            -Dsonar.qualitygate.wait=true
