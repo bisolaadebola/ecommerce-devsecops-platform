@@ -21,10 +21,10 @@ jobs:
     steps:
       - id: list
         run: echo 'list=["chatbot"]' >> "$GITHUB_OUTPUT"
-        All: ["accounting","ad","agent","cart","chatbot","checkout","currency","email",
-              "flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider",
-              "kafka","load-generator","mcp","opamp-server","opensearch","payment",
-              "product-catalog","quote","recommendation","shipping","telemetry-docs"]
+        # All: ["accounting","ad","agent","cart","chatbot","checkout","currency","email",
+        #       "flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider",
+        #       "kafka","load-generator","mcp","opamp-server","opensearch","payment",
+        #       "product-catalog","quote","recommendation","shipping","telemetry-docs"]
 
   build-and-push:
     name: Build ${{ matrix.service }}
