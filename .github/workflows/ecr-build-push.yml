@@ -7,24 +7,21 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write 
+  id-token: write
   contents: read
 
 concurrency: ecr-build-push
 
 jobs:
   # ---- 0. The services to build: edit this one list ----
+  # To build only some services, trim the JSON array in the step below.
   services:
     runs-on: ubuntu-latest
     outputs:
       list: ${{ steps.list.outputs.list }}
     steps:
       - id: list
-        run: echo 'list=["chatbot"]' >> "$GITHUB_OUTPUT"
-        All: ["accounting","ad","agent","cart","chatbot","checkout","currency","email",
-              "flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider",
-              "kafka","load-generator","mcp","opamp-server","opensearch","payment",
-              "product-catalog","quote","recommendation","shipping","telemetry-docs"]
+        run: echo 'list=["accounting","ad","agent","cart","chatbot","checkout","currency","email","flagd-ui","fraud-detection","frontend","frontend-proxy","image-provider","kafka","load-generator","mcp","opamp-server","opensearch","payment","product-catalog","quote","recommendation","shipping","telemetry-docs"]' >> "$GITHUB_OUTPUT"
 
   build-and-push:
     name: Build ${{ matrix.service }}
@@ -47,10 +44,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: who ami
-        run: |
-           whoami
-
       - name: Log in to ECR (our images)
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -61,14 +54,17 @@ jobs:
           registry-type: public
 
       - name: Create the ECR repository if it doesn't exist
-        run: aws ecr describe-repositories --repository-names "$IMAGE" ||
-             aws ecr create-repository --repository-name "$IMAGE" --image-scanning-configuration scanOnPush=true
+        run: |
+          aws ecr describe-repositories --repository-names "$IMAGE" >/dev/null 2>&1 || \
+            aws ecr create-repository \
+              --repository-name "$IMAGE" \
+              --image-scanning-configuration scanOnPush=true
 
       - name: Read version pins from .env
         run: grep -E '^(OTEL_JAVA_AGENT_VERSION|OPENTELEMETRY_CPP_VERSION|OPAMP_GO_REF)=' .env >> "$GITHUB_ENV"
 
-      # Self-hosted runner: free disk space left over from earlier builds
-      # (layers are still reused from the GitHub Actions cache)
+      # Free disk space on the runner (large images can fill it up;
+      # layers are still reused from the GitHub Actions cache)
       - name: Free disk space
         run: |
           df -h / | tail -1
@@ -97,26 +93,26 @@ jobs:
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ github.run_number }}
             ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:latest
 
-  # ---- 2. Point the k8s-file repo at the new images; Argo CD deploys them ----
-  # update-k8s-manifests:
-  #   needs: [services, build-and-push] # runs only if every image built
-  #   runs-on: self-hosted
-  #   steps:
-  #     - uses: actions/checkout@v7
-  #       with:
-  #         repository: digitalwitchdemo/k8s-file
-  #         token: ${{ secrets.K8S_REPO_TOKEN }}
+  # ---- 2. Point the manifests repo at the new images; Argo CD deploys them ----
+  update-k8s-manifests:
+    needs: [services, build-and-push] # runs only if every image built
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: bisolaadebola/ecommerce-kubernetes-manifests
+          token: ${{ secrets.K8S_REPO_TOKEN }}
 
-  #     - name: Set the new image tag and push
-  #       env:
-  #         SERVICES: ${{ join(fromJSON(needs.services.outputs.list), ' ') }}
-  #       run: |
-  #         TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
-  #         # Only the images built in this run: the newTag line under each "ecomerce/<service>"
-  #         for svc in $SERVICES; do
-  #           sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
-  #         done
-  #         git config user.name "github-actions[bot]"
-  #         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-  #         git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
-  #         git push
+      - name: Set the new image tag and push
+        env:
+          SERVICES: ${{ join(fromJSON(needs.services.outputs.list), ' ') }}
+        run: |
+          TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
+          # Only the images built in this run: the newTag line under each "ecomerce/<service>"
+          for svc in $SERVICES; do
+            sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Deploy images from build #$TAG" -m "Commit: $GITHUB_SHA" || exit 0 # nothing changed
+          git push
