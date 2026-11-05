@@ -100,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          repository: bisolaadebola/ecommerce-kubernetes-manifests
+          repository: bisolaadebola/ecomerce-kubernetes-manifests
           token: ${{ secrets.K8S_REPO_TOKEN }}
 
       - name: Set the new image tag and push
@@ -110,7 +110,7 @@ jobs:
           TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
           # Only the images built in this run: the newTag line under each "ecommerce/<service>"
           for svc in $SERVICES; do
-            sed -i -E "/ecommerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
+            sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
           done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
