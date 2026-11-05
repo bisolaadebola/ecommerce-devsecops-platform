@@ -32,7 +32,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.services.outputs.list) }}
     env:
-      IMAGE: ecommerce/${{ matrix.service }} # ECR repository name
+      IMAGE: ecomerce/${{ matrix.service }} # ECR repository name
       # Every Dockerfile is at src/<service>/Dockerfile, except cart's
       DOCKERFILE: ${{ matrix.service == 'cart' && 'src/cart/src/Dockerfile' || format('src/{0}/Dockerfile', matrix.service) }}
     steps:
@@ -100,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          repository: bisolaadebola/ecomerce-kubernetes-manifests
+          repository: bisolaadebola/ecommerce-kubernetes-manifests
           token: ${{ secrets.K8S_REPO_TOKEN }}
 
       - name: Set the new image tag and push
