@@ -32,7 +32,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.services.outputs.list) }}
     env:
-      IMAGE: ecomerce/${{ matrix.service }} # ECR repository name
+      IMAGE: ecommerce/${{ matrix.service }} # ECR repository name
       # Every Dockerfile is at src/<service>/Dockerfile, except cart's
       DOCKERFILE: ${{ matrix.service == 'cart' && 'src/cart/src/Dockerfile' || format('src/{0}/Dockerfile', matrix.service) }}
     steps:
@@ -108,9 +108,9 @@ jobs:
           SERVICES: ${{ join(fromJSON(needs.services.outputs.list), ' ') }}
         run: |
           TAG="$GITHUB_RUN_NUMBER" # same tag the build job pushed
-          # Only the images built in this run: the newTag line under each "ecomerce/<service>"
+          # Only the images built in this run: the newTag line under each "ecommerce/<service>"
           for svc in $SERVICES; do
-            sed -i -E "/ecomerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
+            sed -i -E "/ecommerce\/$svc\$/{n;s|(newTag: ).*|\1\"$TAG\"|}" */kustomization.yaml
           done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
