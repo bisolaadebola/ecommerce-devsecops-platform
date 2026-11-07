@@ -115,3 +115,16 @@ tab, set the server to `https://shop.digitalwitch.online`.
 
 Based on the [OpenTelemetry Demo](https://github.com/open-telemetry/opentelemetry-demo),
 licensed under the Apache License 2.0 (see [LICENSE](LICENSE)).
+
+
+## Phase 3: ECR image build and manifest update
+
+**DevOps Engineer:** BisolaAdebola
+
+The GitHub Actions workflow in `.github/workflows/ecr-build-push.yml` builds the platform's 24 service images for Linux AMD64 and pushes them to Amazon ECR. It tags each image with the workflow run number and `latest`. After every image builds successfully, the workflow updates the corresponding image tags in the [`ecommerce-kubernetes-manifests`](https://github.com/bisolaadebola/ecommerce-kubernetes-manifests) repository. Argo CD then detects the Git change and deploys the updated workloads to EKS.
+
+The workflow uses GitHub OIDC to assume an AWS role instead of storing long-lived AWS access keys in GitHub. The successful Actions run below shows the image build matrix and the manifest-update job completing.
+
+![GitHub Actions successfully built and pushed the ECR images and updated Kubernetes manifests](screenshots/08-github-actions-ecr-build-and-manifest-update.png)
+
+The deployment and runtime evidence—Argo CD health, the live shop, AI assistant, metrics, traces, and logs—is documented in the [Kubernetes manifests repository](https://github.com/bisolaadebola/ecommerce-kubernetes-manifests#phase-3-application-deployment-with-argo-cd).
