@@ -84,7 +84,7 @@ Then follow it:
 | Images in ECR | AWS Console → **ECR** → `ecomerce/<service>`; the newest tag = the run number (`#N`) |
 | Tag updated | `k8s-file` repo → new commit **"Deploy images from build #N"** |
 | Deployed | Argo CD UI → app **astronomy-shop** = `Synced` / `Healthy` |
-| Live | https://shop.digitalwitch.online |
+| Live | https://shop.bfithub.store |
 
 **Rebuild without a code change:** Actions → *Build and Push Images to ECR* → **Run workflow**.
 
@@ -109,7 +109,7 @@ docker build -f android.Dockerfile --platform=linux/amd64 --output=. .
 ```
 
 Install `reactnativeapp.apk` on a phone or emulator. In the app's **Settings**
-tab, set the server to `https://shop.digitalwitch.online`.
+tab, set the server to `https://shop.bfithub.store`.
 
 ## License
 
